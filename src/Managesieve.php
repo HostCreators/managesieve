@@ -8,6 +8,7 @@
 
 namespace Managesieve;
 
+use Managesieve\Exceptions\AuthenticationException;
 use Managesieve\Exceptions\SieveException;
 use Managesieve\Exceptions\SocketException;
 use Psr\Log\LoggerInterface;
@@ -300,7 +301,7 @@ class Managesieve
         // picked up from an existing connection.
         try {
             $this->cmdCapability();
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             throw new SieveException($e);
         }
 
@@ -310,7 +311,7 @@ class Managesieve
                 !empty($this->capability['starttls']))) {
             $this->doCmd('STARTTLS');
             if (!$this->sock->startTls()) {
-                throw new Exception('Failed to establish TLS connection');
+                throw new SieveException('Failed to establish TLS connection');
             }
 
             // The server should be sending a CAPABILITY response after
@@ -327,7 +328,7 @@ class Managesieve
             // encryption.
             try {
                 $this->cmdCapability();
-            } catch (Exception $e) {
+            } catch (\Exception $e) {
                 throw new SieveException($e);
             }
         }
@@ -377,7 +378,7 @@ class Managesieve
 
         $this->checkConnected();
         if (self::STATE_AUTHENTICATED == $this->state) {
-            throw new Exception('Already authenticated');
+            throw new AuthenticationException('Already authenticated');
         }
 
         $this->cmdAuthenticate(
@@ -487,7 +488,7 @@ class Managesieve
             $this->doCmd(
                 sprintf('HAVESPACE %s %d', $this->escape($scriptname), $size)
             );
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             return false;
         }
 
@@ -600,7 +601,7 @@ class Managesieve
                 $this->authEXTERNAL($uid, $pwd, $euser);
                 break;
             default :
-                throw new Exception(
+                throw new AuthenticationException(
                     $method . ' is not a supported authentication method'
                 );
                 break;
@@ -611,8 +612,8 @@ class Managesieve
         // Query the server capabilities again now that we are authenticated.
         try {
             $this->cmdCapability();
-        } catch (Exception $e) {
-            throw new SieveException($e);
+        } catch (\Throwable $e) {
+            throw new SieveException($e->getMessage(), $e->getCode(), $e);
         }
     }
 
@@ -668,7 +669,7 @@ class Managesieve
         $cram = Auth_SASL::factory('crammd5');
         $response = $cram->getResponse($user, $pass, $challenge);
         if (is_a($response, 'PEAR_Error')) {
-            throw new Exception($response);
+            throw new SieveException($response);
         }
         $this->sendStringResponse(base64_encode($response));
     }
@@ -904,7 +905,7 @@ class Managesieve
     {
         $status = $this->sock->getStatus();
         if ($status['eof']) {
-            throw new Exception('Failed to write to socket: connection lost');
+            throw new SieveException('Failed to write to socket: connection lost');
         }
         $this->sock->write($cmd . "\r\n");
         $this->debug("C: $cmd");
@@ -932,7 +933,7 @@ class Managesieve
         $lastline = rtrim($this->sock->gets(8192));
         $this->debug("S: $lastline");
         if ($lastline === '') {
-            throw new Exception('Failed to read from socket');
+            throw new SieveException('Failed to read from socket');
         }
         return $lastline;
     }
@@ -994,14 +995,14 @@ class Managesieve
                         return rtrim($response);
                     }
 
-                    throw new Exception(trim($response . substr($line, 2)), 3);
+                    throw new SieveException(trim($response . substr($line, 2)), 3);
                 }
 
                 if (preg_match('/^BYE/i', $line)) {
                     try {
                         $this->disconnect(false);
-                    } catch (Exception $e) {
-                        throw new Exception(
+                    } catch (\Exception $e) {
+                        throw new SieveException(
                             'Cannot handle BYE, the error was: '
                             . $e->getMessage(),
                             4
@@ -1018,7 +1019,7 @@ class Managesieve
                         );
                         try {
                             $this->handleConnectAndLogin();
-                        } catch (Exception $e) {
+                        } catch (\Exception $e) {
                             throw new SieveException(
                                 'Cannot follow referral to '
                                 . $this->params['host'] . ', the error was: '
@@ -1027,7 +1028,7 @@ class Managesieve
                         }
                         break;
                     }
-                    throw new Exception(trim($response . $line), 6);
+                    throw new SieveException(trim($response . $line), 6);
                 }
 
                 if (preg_match('/^{([0-9]+)}/', $line, $matches)) {
@@ -1069,12 +1070,12 @@ class Managesieve
     protected function getBestAuthMethod($authmethod = null)
     {
         if (!isset($this->capability['sasl'])) {
-            throw new Exception(
+            throw new AuthenticationException(
                 'This server doesn\'t support any authentication methods. SASL problem?'
             );
         }
         if (!$this->capability['sasl']) {
-            throw new Exception(
+            throw new AuthenticationException(
                 'This server doesn\'t support any authentication methods.'
             );
         }
@@ -1083,7 +1084,7 @@ class Managesieve
             if (in_array($authmethod, $this->capability['sasl'])) {
                 return $authmethod;
             }
-            throw new Exception(
+            throw new AuthenticationException(
                 sprintf(
                     'No supported authentication method found. The server supports these methods: %s, but we want to use: %s',
                     implode(', ', $this->capability['sasl']),
@@ -1098,7 +1099,7 @@ class Managesieve
             }
         }
 
-        throw new Exception(
+        throw new AuthenticationException(
             sprintf(
                 'No supported authentication method found. The server supports these methods: %s, but we only support: %s',
                 implode(', ', $this->capability['sasl']),

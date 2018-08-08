@@ -19,4 +19,9 @@ namespace Managesieve\Exceptions;
 class AuthenticationException extends SieveException
 {
 
+    /**
+     * @var int
+     */
+    protected $code = 103;
+
 }

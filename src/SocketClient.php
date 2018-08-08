@@ -25,28 +25,28 @@ class SocketClient
      *
      * @var boolean
      */
-    protected $_connected = false;
+    protected $connected = false;
 
     /**
      * Configuration parameters.
      *
      * @var array
      */
-    protected $_params;
+    protected $params = [];
 
     /**
      * Is the connection secure?
      *
      * @var boolean
      */
-    protected $_secure = false;
+    protected $secure = false;
 
     /**
      * The actual socket.
      *
      * @var resource
      */
-    protected $_stream;
+    protected $stream = null;
 
     /**
      * Constructor.
@@ -71,30 +71,30 @@ class SocketClient
      * @throws SocketException
      */
     public function __construct(
-        $host, $port = null, $timeout = 30, $secure = false,
-        $context = array(), array $params = array()
+        string $host, int $port = null, int $timeout = 30, $secure = false,
+        array $context = [], array $params = []
     )
     {
         if ($secure && !extension_loaded('openssl')) {
             if ($secure !== true) {
-                throw new \InvalidArgumentException('Secure connections require the PHP openssl extension.');
+                throw new SocketException('Secure connections require the PHP openssl extension.');
             }
             $secure = false;
         }
 
         $context = array_merge_recursive(
-            array(
-                'ssl' => array(
+            [
+                'ssl' => [
                     'verify_peer' => false,
                     'verify_peer_name' => false
-                )
-            ),
+                ]
+            ],
             $context
         );
 
-        $this->_params = $params;
+        $this->params = $params;
 
-        $this->_connect($host, $port, $timeout, $secure, $context);
+        $this->connect($host, $port, $timeout, $secure, $context);
     }
 
     /**
@@ -105,10 +105,10 @@ class SocketClient
     {
         switch ($name) {
             case 'connected':
-                return $this->_connected;
+                return $this->connected;
 
             case 'secure':
-                return $this->_secure;
+                return $this->secure;
         }
     }
 
@@ -117,7 +117,7 @@ class SocketClient
      */
     public function __clone()
     {
-        throw new \LogicException('Object cannot be cloned.');
+        throw new SocketException('Object cannot be cloned.');
     }
 
     /**
@@ -125,7 +125,7 @@ class SocketClient
      */
     public function __sleep()
     {
-        throw new \LogicException('Object can not be serialized.');
+        throw new SocketException('Object can not be serialized.');
     }
 
     /**
@@ -143,8 +143,8 @@ class SocketClient
             } else {
                 $mode = STREAM_CRYPTO_METHOD_TLS_CLIENT;
             }
-            if (@stream_socket_enable_crypto($this->_stream, true, $mode) === true) {
-                $this->_secure = true;
+            if (stream_socket_enable_crypto($this->stream, true, $mode) === true) {
+                $this->secure = true;
                 return true;
             }
         }
@@ -154,14 +154,16 @@ class SocketClient
 
     /**
      * Close the connection.
+     * @return $this
      */
     public function close()
     {
         if ($this->connected) {
-            @fclose($this->_stream);
-            $this->_connected = $this->_secure = false;
-            $this->_stream = null;
+            fclose($this->stream);
+            $this->connected = $this->secure = false;
+            $this->stream = null;
         }
+        return $this;
     }
 
     /**
@@ -176,10 +178,14 @@ class SocketClient
      * @throws SocketException
      * @return array  Information about existing socket resource.
      */
-    public function getStatus()
+    public function getStatus() : array
     {
-        $this->_checkStream();
-        return stream_get_meta_data($this->_stream);
+        $this->checkStream();
+        $res = stream_get_meta_data($this->stream);
+        if ($res === false) {
+            throw new SocketException('Error reading metadata from socket');
+        }
+        return $res;
     }
 
     /**
@@ -191,10 +197,10 @@ class SocketClient
      * @throws SocketException
      * @return string  $size bytes of data from the socket
      */
-    public function gets($size)
+    public function gets($size) : string
     {
-        $this->_checkStream();
-        $data = @fgets($this->_stream, $size);
+        $this->checkStream();
+        $data = fgets($this->stream, $size);
         if ($data === false) {
             throw new SocketException('Error reading data from socket');
         }
@@ -209,10 +215,10 @@ class SocketClient
      * @throws SocketException
      * @return string  $size bytes of data from the socket.
      */
-    public function read($size)
+    public function read($size) : string
     {
-        $this->_checkStream();
-        $data = @fread($this->_stream, $size);
+        $this->checkStream();
+        $data = fread($this->stream, $size);
         if ($data === false) {
             throw new SocketException('Error reading data from socket');
         }
@@ -226,10 +232,10 @@ class SocketClient
      *
      * @throws SocketException
      */
-    public function write($data)
+    public function write(string $data)
     {
-        $this->_checkStream();
-        if (!@fwrite($this->_stream, $data)) {
+        $this->checkStream();
+        if (!fwrite($this->stream, $data)) {
             $meta_data = $this->getStatus();
             if (!empty($meta_data['timed_out'])) {
                 throw new SocketException('Timed out writing data to socket');
@@ -238,16 +244,16 @@ class SocketClient
         }
     }
 
-    /* Internal methods. */
-
     /**
      * Connect to the remote server.
-     *
-     * @see __construct()
-     *
-     * @throws SocketException
+     * @param $host
+     * @param $port
+     * @param $timeout
+     * @param $secure
+     * @param $context
+     * @param int $retries
      */
-    protected function _connect(
+    protected function connect(
         $host, $port, $timeout, $secure, $context, $retries = 0
     )
     {
@@ -258,12 +264,12 @@ class SocketClient
                 case 'sslv2':
                 case 'sslv3':
                     $conn = $secure . '://';
-                    $this->_secure = true;
+                    $this->secure = true;
                     break;
 
                 case 'tlsv1':
                     $conn = 'tls://';
-                    $this->_secure = true;
+                    $this->secure = true;
                     break;
 
                 case 'tls':
@@ -277,7 +283,7 @@ class SocketClient
             $conn .= ':' . $port;
         }
 
-        $this->_stream = @stream_socket_client(
+        $this->stream = stream_socket_client(
             $conn,
             $error_number,
             $error_string,
@@ -286,7 +292,7 @@ class SocketClient
             stream_context_create($context)
         );
 
-        if ($this->_stream === false) {
+        if ($this->stream === false) {
             /* From stream_socket_client() page: a function return of false,
              * with an error code of 0, indicates a "problem initializing the
              * socket". These kind of issues are seen on the same server
@@ -294,24 +300,19 @@ class SocketClient
              * these are likely transient issues. Retry up to 3 times in these
              * instances. */
             if (!$error_number && ($retries < 3)) {
-                return $this->_connect($host, $port, $timeout, $secure, $context, ++$retries);
+                $this->connect($host, $port, $timeout, $secure, $context, ++$retries);
             }
 
-            $e = new SocketException(
-                'Error connecting to server.'
-            );
-            $e->details = sprintf("[%u] %s", $error_number, $error_string);
+            $e = (new SocketException('Error connecting to server.'))
+                ->setDetails(sprintf("[%u] %s", $error_number, $error_string));
             throw $e;
         }
 
-        stream_set_timeout($this->_stream, $timeout);
+        stream_set_timeout($this->stream, $timeout);
+        stream_set_read_buffer($this->stream, 0);
+        stream_set_write_buffer($this->stream, 0);
 
-        if (function_exists('stream_set_read_buffer')) {
-            stream_set_read_buffer($this->_stream, 0);
-        }
-        stream_set_write_buffer($this->_stream, 0);
-
-        $this->_connected = true;
+        $this->connected = true;
     }
 
     /**
@@ -319,9 +320,9 @@ class SocketClient
      *
      * @throws SocketException
      */
-    protected function _checkStream()
+    protected function checkStream()
     {
-        if (!is_resource($this->_stream)) {
+        if (!is_resource($this->stream)) {
             throw new SocketException('Not connected');
         }
     }

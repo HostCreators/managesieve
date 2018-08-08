@@ -19,6 +19,9 @@ namespace Managesieve\Exceptions;
 class SieveException extends \RuntimeException
 {
 
+    /**
+     * @var int
+     */
     protected $code = 100;
 
 }

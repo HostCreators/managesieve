@@ -19,6 +19,9 @@ namespace Managesieve\Exceptions;
 class UnknownErrorException extends SieveException
 {
 
+    /**
+     * @var int
+     */
     protected $code = 101;
 
 }
