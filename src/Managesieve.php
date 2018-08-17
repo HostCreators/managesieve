@@ -164,7 +164,7 @@ class Managesieve
      *
      * @throws SieveException
      */
-    public function __construct(string $host, string $user, string $password, int $port = null, LoggerInterface $logger = null)
+    public function __construct(string $host, string $user = '', string $password, int $port = null, LoggerInterface $logger = null)
     {
         $this->params = array_merge(
             array(
@@ -208,6 +208,16 @@ class Managesieve
             strlen($this->params['password'])) {
             $this->handleConnectAndLogin();
         }
+    }
+
+    /**
+     * Set user
+     * @param string $user
+     * @return $this
+     */
+    public function setUser(string $user) {
+        $this->params['user'] = $user;
+        return $this;
     }
 
     /**
@@ -785,19 +795,19 @@ class Managesieve
         $result = $this->doCmd('LISTSCRIPTS');
 
         $scripts = array();
-        $activescript = null;
+        $activeScript = null;
         $result = explode("\r\n", $result);
         foreach ($result as $value) {
             if (preg_match('/^"(.*)"( ACTIVE)?$/i', $value, $matches)) {
                 $script_name = stripslashes($matches[1]);
                 $scripts[] = $script_name;
                 if (!empty($matches[2])) {
-                    $activescript = $script_name;
+                    $activeScript = $script_name;
                 }
             }
         }
 
-        return array($scripts, $activescript);
+        return array($scripts, $activeScript);
     }
 
     /**
