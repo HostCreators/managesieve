@@ -293,8 +293,7 @@ class Managesieve
         try {
             $this->sock = new SocketClient(
                 $this->params['host'],
-                $this->params['port'],
-                $this->logger
+                $this->params['port']
             );
         } catch (SocketException $e) {
             throw new SieveException($e);
