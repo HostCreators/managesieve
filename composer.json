@@ -1,16 +1,16 @@
 {
-    "name": "zambodaniel/managesieve",
-    "description": "Managesieve is a library to manage and modify sieve (RFC5228) scripts.",
-    "keywords": ["sieve", "filters", "mail", "managesieve"],
+    "name": "hostcreators/managesieve",
+    "description": "Managesieve is a library to manage and modify sieve (RFC5228) scripts. Originally created by zambodaniel/managesieve",
+    "keywords": ["sieve", "filters", "mail", "managesieve", "php"],
     "type": "library",
     "license": "MIT",
-    "homepage": "https://github.com/zambodaniel/managesieve",
+    "homepage": "https://github.com/HostCreators/managesieve",
     "authors":
     [
         {
-            "name": "Daniel Zambo",
-            "homepage": "https://github.com/zambodaniel",
-            "email": "zambodaniel@gmail.com"
+            "name": "Michal Krnáč",
+            "homepage": "https://github.com/krtcom",
+            "email": "michal.krnac@webcreators.sk"
         }
     ],
     "require":
@@ -19,7 +19,7 @@
         "ext-mbstring": "*",
         "ext-sockets": "*",
         "ext-openssl": "*",
-        "psr/log": "^1.0",
+        "psr/log": "^3.0",
         "pear/auth_sasl": "*"
     },
     "autoload":
@@ -28,8 +28,5 @@
         {
             "Managesieve\\": "src/"
         }
-    },
-    "require-dev": {
-        "phpunit/phpunit": "^6.4"
     }
 }
